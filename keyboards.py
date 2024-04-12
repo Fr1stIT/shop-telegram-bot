@@ -41,8 +41,9 @@ def ver_button(first: str, second: str):
 
 def submit_payment(callback_data):
     kbb = [
-        [InlineKeyboardButton(text='Подтвердить' , callback_data=callback_data),
-         ]
+        [InlineKeyboardButton(text='Подтвердить', callback_data=callback_data),
+         ],
+        [InlineKeyboardButton(text='Отправить код', callback_data='PIN'+callback_data)]
     ]
 
     ikb = InlineKeyboardMarkup(inline_keyboard=kbb)

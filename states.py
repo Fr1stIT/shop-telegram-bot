@@ -18,5 +18,11 @@ class Delete_prod(StatesGroup):
 class Buy_item(StatesGroup):
     address = State()
     phone_number = State()
+    name = State()
     order = State()
     check = State()
+
+
+class Send_post_code(StatesGroup):
+    id = State()
+    wait_for_post_code = State()

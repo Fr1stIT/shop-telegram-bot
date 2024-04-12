@@ -167,8 +167,16 @@ async def item_buy(callback: CallbackQuery, state: FSMContext):
 @dp.message(Buy_item.phone_number)
 async def item_buy (message: Message, state: FSMContext):
     await message.answer(
-        f'📞 Укажите свой номер телефона. Например: +7952812999')
+        f'👤 Укажите свои Имя и Фамилию')
     await state.update_data(address = message.text)
+    await state.set_state(Buy_item.name)
+
+
+@dp.message(Buy_item.name)
+async def item_buy (message: Message, state: FSMContext):
+    await message.answer(
+        f'📞 Укажите свой номер телефона. Например: +7952812999')
+    await state.update_data(name = message.text)
     await state.set_state(Buy_item.order)
 
 
@@ -178,9 +186,9 @@ async def item_buy (message: Message, state: FSMContext):
     phone_number = message.text
     data = await state.get_data()
     print(data)
-    db.order(message.from_user.id, data["order"], data["address"], phone_number)
+    db.order(data["name"],message.from_user.id, data["order"], data["address"], phone_number)
     await message.answer(
-        f'✅ <b>Заказ номер {message.from_user.id} открыт!</b> ✅\n🏠 <b>Адрес доставки:</b> {data["address"]}\n📞 <b>Номер телефона:</b> {phone_number}\n<b>Чтобы отменить его, напишите /cancel</b>\nОплатите на карту Сбербанка по номеру <b>+79951714556</b> и пришлите чек.\nВ описании фотографии напишите Имя и фамилию', parse_mode='html')
+        f'✅ <b>Заказ номер {message.from_user.id} открыт!</b> ✅\n🏠 <b>Адрес доставки:</b> {data["address"]}\n📞 <b>Номер телефона:</b> {phone_number}\n<b>Чтобы отменить его, напишите /cancel</b>\n💸 Оплатите на карту Сбербанка по номеру <b>+79951714556 (Елена Р.)</b> и пришлите чек в этот чат.', parse_mode='html')
 
     await state.set_state(Buy_item.check)
 
@@ -200,9 +208,12 @@ async def canccel_but (message: Message, state: FSMContext):
 async def verify_buy (message: Message, state: FSMContext):
     #Пересылка сообщения другому человеку (по user_id указанному заранее)
     orderss = db.check_order(message.from_user.id)[0]
-    string = f'Заказ №{orderss[0]}. Товар - {db.get_info_product_id(orderss[1])[0][1]}.\nАдрес: {orderss[2]}\nНомер телефона: {orderss[3]}, Юзернейм: {message.from_user.username}'
-    await bot.send_message(admin_id[0], string, reply_markup=kb.submit_payment(str(orderss[0])))
+    print(orderss)
+    string = f'<b>Заказ №{orderss[0]}</b>. <b>{orderss[2]}</b>\n<b>Товар</b> - {db.get_info_product_id(orderss[4])[0][1]}.\n<b>Адрес</b>: {orderss[5]}\n<b>Номер телефона:</b> {orderss[6]}, <b>Юзернейм:</b> {message.from_user.username}'
+    await bot.send_message(chat_id=admin_id[0], text='<b>Поступил новый заказ!</b>', parse_mode='html')
     await message.send_copy(chat_id=admin_id[0])
+    await bot.send_message(admin_id[0], string, reply_markup=kb.submit_payment(str(orderss[0])), parse_mode='html')
+
     await message.reply('🧾 Ваш чек был отправлен администратору, ожидайте ответ!')
     await state.clear()
 
@@ -211,14 +222,39 @@ async def verify_buy (message: Message, state: FSMContext):
 
 
 @dp.callback_query()
-async def item_buy (callback: CallbackQuery):
+async def item_buy (callback: CallbackQuery, state: FSMContext):
    if callback.from_user.id in admin_id:
+       print(callback.data[:3])
+       if callback.data.startswith("PIN"):
+           print(db.get_post_code(int(callback.data[3:])))
+           if db.get_post_code(int(callback.data[3:]))[0] is None:
+               await callback.message.answer('Отправте код отправления')
+               await state.update_data(id=int(callback.data[3:]))
+               await state.set_state(Send_post_code.wait_for_post_code)
+           else:
+               await callback.answer('')
+               await callback.message.answer('У данного заказа уже указан код отправления!')
+       else:
         await callback.answer('')
         db.move_data_to_orders(int(callback.data))
         await bot.send_message(int(callback.data), '🧾 Ваша оплата подтверждена аднимистратором! Ожидайте, с Вами свяжутся. ☑️')
 
-##################################################################################################################################################################
 
+
+
+
+@dp.message(Send_post_code.wait_for_post_code)
+async def resend_post_code(message: Message, state: FSMContext):
+    user_id = await state.get_data()
+    user_id = user_id["id"]
+    await bot.send_message(chat_id=user_id, text=f'<b>Ваш код отправления</b> <code>{message.text}</code>', parse_mode='html')
+    await message.answer('Код отправления был успешно доставлен покупателю!')
+    id_of_order = db.get_last_row_by_user_id(user_id)
+    print(id_of_order)
+    db.set_post_code(user_id, id_of_order, message.text)
+    await state.clear()
+
+##################################################################################################################################################################
 @dp.message(F.text == 'Главная')
 async def pick (message: Message):
     await message.reply('Вы на главной странице!', reply_markup=kb.main_kb)

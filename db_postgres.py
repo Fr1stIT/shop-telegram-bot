@@ -26,6 +26,7 @@ class Database:
             create_users_table_query = """CREATE TABLE IF NOT EXISTS users (
                                             user_id BIGINT PRIMARY KEY,
                                             username TEXT,
+                                            real_name TEXT,
                                             open_order BIGINT,
                                             product INTEGER,
                                             address TEXT,
@@ -44,12 +45,15 @@ class Database:
             create_completed_tasks_query = """CREATE TABLE IF NOT EXISTS orders (
                                                             user_id BIGINT,
                                                             username TEXT,
+                                                            real_name TEXT,
                                                             open_order BIGINT,
                                                             product INTEGER,
                                                             address TEXT,
                                                             phone_number TEXT,
                                                             open_date DATE,
-                                                            closed_date DATE
+                                                            closed_date DATE,
+                                                            post_code TEXT,
+                                                            id SERIAL PRIMARY KEY
                                                         )"""
             self.cursor.execute(create_users_table_query)
             self.cursor.execute(create_products_table_query)
@@ -171,19 +175,19 @@ class Database:
         except Error as e:
             print(f"Error while clearing user data by username: {e}")
 
-    def order(self, user_id, product,address,phone_number):
+    def order(self, real_name, user_id, product,address,phone_number):
         try:
             current_datetime = datetime.datetime.now()
             formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
-            update_query = "UPDATE users SET open_order = %s, product = %s, address = %s, phone_number = %s, open_date = %s WHERE user_id = %s"
-            self.cursor.execute(update_query, (user_id, product,address,phone_number,formatted_datetime,user_id))
+            update_query = "UPDATE users SET real_name = %s, open_order = %s, product = %s, address = %s, phone_number = %s, open_date = %s WHERE user_id = %s"
+            self.cursor.execute(update_query, (real_name, user_id, product,address,phone_number,formatted_datetime,user_id))
             self.connection.commit()
         except Error as e:
             print(f"Error while placing order: {e}")
 
     def check_order(self, user_id):
         try:
-            select_query = "SELECT open_order, product, address, phone_number FROM users WHERE user_id = %s"
+            select_query = "SELECT * FROM users WHERE user_id = %s"
             self.cursor.execute(select_query, (user_id,))
             return self.cursor.fetchall()
         except Error as e:
@@ -244,6 +248,44 @@ class Database:
         except Error as e:
             print(f"Error while connecting to PostgreSQL: {e}")
 
+    def get_post_code(self, user_id):
+        try:
+            select_query = "SELECT post_code FROM orders WHERE user_id = %s"
+            self.cursor.execute(select_query, (user_id,))
+            return self.cursor.fetchone()
+        except Error as e:
+            print(f"Error while fetching post code: {e}")
+
+    def set_post_code(self, user_id, id, post_code):
+        try:
+            update_query = "UPDATE orders SET post_code = %s WHERE user_id = %s AND id = %s"
+            self.cursor.execute(update_query, (post_code, user_id, id))
+            self.connection.commit()
+            print("Post code updated successfully.")
+        except Error as e:
+            print(f"Error while setting post code: {e}")
+
+    def get_product_by_user_id(self, user_id):
+        try:
+            select_query = "SELECT product FROM orders WHERE user_id = %s"
+            self.cursor.execute(select_query, (user_id,))
+            return self.cursor.fetchall()
+        except Error as e:
+            print(f"Error while fetching product by user_id: {e}")
+
+    def get_last_row_by_user_id(self, user_id):
+        try:
+            select_query = """
+                  SELECT id
+                  FROM orders
+                  WHERE user_id = %s
+                  AND id = (SELECT MAX(id) FROM orders WHERE user_id = %s)
+              """
+            self.cursor.execute(select_query, (user_id, user_id))
+            return self.cursor.fetchone()
+        except Error as e:
+            print(f"Error while fetching last row by user_id: {e}")
+
 # Пример использования:
 db_params = {
     "host": "localhost",
@@ -254,6 +296,7 @@ db_params = {
 }
 db = Database(db_params)
 # db.add_user(1, "user1")
+print(db.get_last_row_by_user_id(6158117041))
 # db.add_product("product1", "About product 1", "10")
 
 
