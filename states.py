@@ -21,6 +21,7 @@ class Buy_item(StatesGroup):
     name = State()
     order = State()
     check = State()
+    cost = State()
 
 
 class Send_post_code(StatesGroup):

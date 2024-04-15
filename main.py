@@ -45,7 +45,7 @@ async def handler(message: Message, command: CommandObject, state: FSMContext):
     stringformat = f'<b>🛒 Вы собираетесь купить товар:</b> 🛒\n<b>💫 Название</b> - {data[1]}\n💫 <b>Описание</b> - {data[3]}\n💫 <b>Стоимость</b> - <b>{data[2]}</b>'
 
     await bot.send_photo(chat_id=message.chat.id, photo=types.FSInputFile(path=data[4]), caption=stringformat, reply_markup=kb.ver_button('Купить', 'Отмена'), parse_mode='html')
-    await state.update_data(order=data[0])
+    await state.update_data(order=data[0], cost=data[2])
     await state.set_state(Buy_item.address)
 
 
@@ -188,7 +188,7 @@ async def item_buy (message: Message, state: FSMContext):
     print(data)
     db.order(data["name"],message.from_user.id, data["order"], data["address"], phone_number)
     await message.answer(
-        f'✅ <b>Заказ номер {message.from_user.id} открыт!</b> ✅\n🏠 <b>Адрес доставки:</b> {data["address"]}\n📞 <b>Номер телефона:</b> {phone_number}\n<b>Чтобы отменить его, напишите /cancel</b>\n💸 Оплатите на карту Сбербанка по номеру <b>+79951714556 (Елена Р.)</b> и пришлите чек в этот чат.', parse_mode='html')
+        f'✅ <b>Заказ номер {message.from_user.id} открыт!</b> ✅\n🏠 <b>Адрес доставки:</b> {data["address"]}\n📞 <b>Номер телефона:</b> {phone_number}\n<b>Чтобы отменить его, напишите /cancel</b>\n💸 Оплатите на карту Сбербанка по номеру <b>+79951714556 (Елена Р.)</b> сумму <b>{data["cost"]}</b> и пришлите чек в этот чат.', parse_mode='html')
 
     await state.set_state(Buy_item.check)
 
@@ -207,15 +207,20 @@ async def canccel_but (message: Message, state: FSMContext):
 @dp.message(Buy_item.check)
 async def verify_buy (message: Message, state: FSMContext):
     #Пересылка сообщения другому человеку (по user_id указанному заранее)
-    orderss = db.check_order(message.from_user.id)[0]
-    print(orderss)
-    string = f'<b>Заказ №{orderss[0]}</b>. <b>{orderss[2]}</b>\n<b>Товар</b> - {db.get_info_product_id(orderss[4])[0][1]}.\n<b>Адрес</b>: {orderss[5]}\n<b>Номер телефона:</b> {orderss[6]}, <b>Юзернейм:</b> {message.from_user.username}'
-    await bot.send_message(chat_id=admin_id[0], text='<b>Поступил новый заказ!</b>', parse_mode='html')
-    await message.send_copy(chat_id=admin_id[0])
-    await bot.send_message(admin_id[0], string, reply_markup=kb.submit_payment(str(orderss[0])), parse_mode='html')
+    if message.photo or message.document:
+        data = await state.get_data()
+        cost = data["cost"]
+        orderss = db.check_order(message.from_user.id)[0]
+        print(orderss)
+        string = f'<b>Заказ №{orderss[0]}</b>. <b>{orderss[2]}</b>\n<b>Товар</b> - {db.get_info_product_id(orderss[4])[0][1]}.\n<b>Адрес</b>: {orderss[5]}\n<b>Номер телефона:</b> {orderss[6]}\n<b>Стоитмость товара:</b> {cost}\n<b>Юзернейм:</b> {message.from_user.username}'
+        await bot.send_message(chat_id=admin_id[0], text='<b>Поступил новый заказ!</b>', parse_mode='html')
+        await message.send_copy(chat_id=admin_id[0])
+        await bot.send_message(admin_id[0], string, reply_markup=kb.submit_payment(str(orderss[0])), parse_mode='html')
 
-    await message.reply('🧾 Ваш чек был отправлен администратору, ожидайте ответ!')
-    await state.clear()
+        await message.reply('🧾 Ваш чек был отправлен администратору, ожидайте ответ!')
+        await state.clear()
+    else:
+        await message.reply('Отправьте фотографию или документ!')
 
 
 ##################################################################################################################################################################
@@ -226,14 +231,19 @@ async def item_buy (callback: CallbackQuery, state: FSMContext):
    if callback.from_user.id in admin_id:
        print(callback.data[:3])
        if callback.data.startswith("PIN"):
-           print(db.get_post_code(int(callback.data[3:])))
-           if db.get_post_code(int(callback.data[3:]))[0] is None:
-               await callback.message.answer('Отправте код отправления')
-               await state.update_data(id=int(callback.data[3:]))
-               await state.set_state(Send_post_code.wait_for_post_code)
-           else:
-               await callback.answer('')
-               await callback.message.answer('У данного заказа уже указан код отправления!')
+           try:
+               print(db.get_post_code(int(callback.data[3:])))
+               if db.get_post_code(int(callback.data[3:]))[0] is None:
+                   await callback.answer('')
+                   await callback.message.answer('Отправте код отправления')
+                   await state.update_data(id=int(callback.data[3:]))
+                   await state.set_state(Send_post_code.wait_for_post_code)
+               else:
+                   await callback.answer('')
+                   await callback.message.answer('У данного заказа уже указан код отправления!')
+           except TypeError as e:
+               print('Отправление кода для несозданного ордера')
+               await callback.answer('Вы еще не подтвердили оплату товара!')
        else:
         await callback.answer('')
         db.move_data_to_orders(int(callback.data))

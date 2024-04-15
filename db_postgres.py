@@ -85,7 +85,7 @@ class Database:
 
     # Остальные методы здесь...
 
-    def get_info(self, user_id):
+    def get_info(self, user_id: int):
         try:
             select_query = "SELECT * FROM users WHERE user_id = %s"
             self.cursor.execute(select_query, (user_id,))
@@ -93,7 +93,7 @@ class Database:
         except Error as e:
             print(f"Error while fetching user info: {e}")
 
-    def get_info_product(self, name):
+    def get_info_product(self, name: str):
         try:
             select_query = "SELECT * FROM products WHERE name = %s"
             self.cursor.execute(select_query, (name,))
@@ -101,7 +101,7 @@ class Database:
         except Error as e:
             print(f"Error while fetching product info: {e}")
 
-    def get_info_product_id(self, product_id):
+    def get_info_product_id(self, product_id: int):
         try:
             select_query = "SELECT * FROM products WHERE id = %s"
             self.cursor.execute(select_query, (product_id,))
@@ -118,7 +118,7 @@ class Database:
         except Error as e:
             print(f"Error while fetching users: {e}")
 
-    def cancel_order(self, user_id):
+    def cancel_order(self, user_id: int):
         try:
             update_query = "UPDATE users SET open_date = NULL, phone_number = NULL, address = NULL, product = NULL, open_order = NULL WHERE user_id = %s"
             self.cursor.execute(update_query, (user_id,))
@@ -159,7 +159,7 @@ class Database:
         except Error as e:
             print(f"Error while fetching sell date: {e}")
 
-    def delete_item(self, name):
+    def delete_item(self, name: str):
         try:
             delete_query = "DELETE FROM products WHERE name = %s"
             self.cursor.execute(delete_query, (name,))
@@ -175,7 +175,7 @@ class Database:
         except Error as e:
             print(f"Error while clearing user data by username: {e}")
 
-    def order(self, real_name, user_id, product,address,phone_number):
+    def order(self, real_name: str, user_id: int, product: int, address: str, phone_number: str):
         try:
             current_datetime = datetime.datetime.now()
             formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
@@ -185,7 +185,7 @@ class Database:
         except Error as e:
             print(f"Error while placing order: {e}")
 
-    def check_order(self, user_id):
+    def check_order(self, user_id: int):
         try:
             select_query = "SELECT * FROM users WHERE user_id = %s"
             self.cursor.execute(select_query, (user_id,))
@@ -193,27 +193,28 @@ class Database:
         except Error as e:
             print(f"Error while checking order: {e}")
 
-
-    def move_data_to_orders(self, user_id_to_move):
+    def move_data_to_orders(self, user_id_to_move: int):
         try:
             # Выборка данных из таблицы users по заданному user_id
-            select_query = "SELECT user_id, username, open_order, product, address, phone_number, open_date FROM users WHERE user_id = %s"
+            select_query = "SELECT user_id, username, real_name, open_order, product, address, phone_number, open_date FROM users WHERE user_id = %s"
             self.cursor.execute(select_query, (user_id_to_move,))
             data_to_move = self.cursor.fetchone()
 
             # Проверка, найдена ли строка с заданным user_id
             if data_to_move:
                 date = datetime.date.today()
-                tmp = []
-                for data in data_to_move:
-                    tmp.append(data)
-                tmp.append(date)
+                # Добавляем текущую дату к данным для закрытого заказа
+                data_to_move += (date,)
+
                 # Вставка данных в таблицу orders
-                insert_query = "INSERT INTO orders (user_id, username, open_order, product, address, phone_number, open_date, closed_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-                self.cursor.execute(insert_query, tmp)
+                insert_query = """
+                    INSERT INTO orders (user_id, username, real_name, open_order, product, address, phone_number, open_date, closed_date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                self.cursor.execute(insert_query, data_to_move)
 
                 # Удаление перенесенной строки из таблицы users
-                delete_query = "UPDATE users SET open_order = NULL, product = NULL, address = NULL, phone_number = NULL, open_date = NULL WHERE user_id = %s"
+                delete_query = "DELETE FROM users WHERE user_id = %s"
                 self.cursor.execute(delete_query, (user_id_to_move,))
 
                 # Коммит транзакции
@@ -223,10 +224,6 @@ class Database:
                 print(f"No data found for user_id {user_id_to_move} in 'users' table.")
         except Error as e:
             print(f"Error while moving data to 'orders' table: {e}")
-
-
-
-
 
     def export_orders(self):
         try:
@@ -296,7 +293,5 @@ db_params = {
 }
 db = Database(db_params)
 # db.add_user(1, "user1")
-print(db.get_last_row_by_user_id(6158117041))
+# print(db.get_last_row_by_user_id(6158117041))
 # db.add_product("product1", "About product 1", "10")
-
-
