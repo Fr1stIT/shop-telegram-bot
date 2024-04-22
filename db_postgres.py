@@ -93,6 +93,15 @@ class Database:
         except Error as e:
             print(f"Error while fetching user info: {e}")
 
+
+    def get_open_order(self, user_id: int):
+        try:
+            select_query = "SELECT open_order FROM users WHERE user_id = %s"
+            self.cursor.execute(select_query, (user_id,))
+            return self.cursor.fetchone()
+        except Error as e:
+            print(f"Error while fetching user info: {e}")
+
     def get_info_product(self, name: str):
         try:
             select_query = "SELECT * FROM products WHERE name = %s"
@@ -247,8 +256,8 @@ class Database:
 
     def get_post_code(self, user_id):
         try:
-            select_query = "SELECT post_code FROM orders WHERE user_id = %s"
-            self.cursor.execute(select_query, (user_id,))
+            select_query = "SELECT post_code FROM orders WHERE user_id = %s AND id = (SELECT MAX(id) FROM orders WHERE user_id = %s)"
+            self.cursor.execute(select_query, (user_id, user_id))
             return self.cursor.fetchone()
         except Error as e:
             print(f"Error while fetching post code: {e}")

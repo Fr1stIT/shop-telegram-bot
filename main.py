@@ -229,20 +229,23 @@ async def verify_buy (message: Message, state: FSMContext):
 @dp.callback_query()
 async def item_buy (callback: CallbackQuery, state: FSMContext):
    if callback.from_user.id in admin_id:
-       print(callback.data[:3])
        if callback.data.startswith("PIN"):
            try:
-               print(db.get_post_code(int(callback.data[3:])))
-               if db.get_post_code(int(callback.data[3:]))[0] is None:
-                   await callback.answer('')
-                   await callback.message.answer('Отправте код отправления')
-                   await state.update_data(id=int(callback.data[3:]))
-                   await state.set_state(Send_post_code.wait_for_post_code)
-               else:
-                   await callback.answer('')
-                   await callback.message.answer('У данного заказа уже указан код отправления!')
+                print(db.get_open_order(callback.data[3:]))
+                if db.get_open_order(callback.data[3:]) is None:
+                    print('Get pos code вернул: '+ str(db.get_post_code(user_id=callback.data[3:])[0]))
+                    if db.get_post_code(user_id=callback.data[3:])[0] is None:
+                       await callback.answer('')
+                       await callback.message.answer('Отправте код отправления')
+                       await state.update_data(id=int(callback.data[3:]))
+                       await state.set_state(Send_post_code.wait_for_post_code)
+                    else:
+                        await callback.answer('У этого заказа уже есть код!')
+                else:
+                    await callback.answer('')
+                    await callback.message.answer('Вы еще не подтвердили оплату товара! ')
            except TypeError as e:
-               print('Отправление кода для несозданного ордера')
+               print(e)
                await callback.answer('Вы еще не подтвердили оплату товара!')
        else:
         await callback.answer('')
